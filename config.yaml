@@ -2,7 +2,7 @@
 # Rule changes require explicit owner approval; the agent never edits limits on its own.
 
 status:
-  mode: setup                 # setup -> backtest -> dry_run -> live -> halted
+  mode: backtest              # setup -> backtest -> dry_run -> live -> halted
   live_approved: false        # flips only after the owner types "go live"
   kill_switch_engaged: false  # set true by the 50% drawdown tier; only the owner may reset it
 
