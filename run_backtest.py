@@ -17,13 +17,10 @@ import pandas as pd
 from backtest import data, engine, report
 from backtest.sleeves import CoreGrowth, CryptoTrend, SwingMomentum
 
-CORE = ["QQQ", "SMH", "XLK", "IGV"]
-SWING = ["NVDA", "AMD", "AVGO", "MSFT", "META", "AMZN", "GOOGL", "AAPL", "TSLA", "NFLX",
-         "CRM", "NOW", "PANW", "CRWD", "ANET", "MU", "SHOP", "UBER", "PLTR", "ADBE"]
-CRYPTO_MAJORS = ["BTC-USD", "ETH-USD"]
-CRYPTO_ALTS = ["SOL-USD", "XRP-USD", "BNB-USD"]
+from backtest.universe import CORE_UNIVERSE as CORE, CRYPTO_ALTS, CRYPTO_MAJORS, SWING_UNIVERSE as SWING
+
 STOCK_COSTS = engine.Costs(slippage=0.0005, limit_offset=0.005)
-CRYPTO_COSTS = engine.Costs(slippage=0.0050, limit_offset=0.005)  # ~0.5% spread per fill
+CRYPTO_COSTS = engine.Costs(slippage=0.0050, limit_offset=0.005, settle_bars=0)  # ~0.5% spread per fill
 
 
 def main(argv=None) -> Path:
@@ -94,8 +91,8 @@ def main(argv=None) -> Path:
         by_setup = pd.Series([tr.setup for tr in res.trades]).value_counts().to_dict()
         out += [f"- Trades by setup: {by_setup}", ""]
     out += ["## Caveats", "",
-            "- The swing list is today's leaders, so it suffers from survivorship bias "
-            "(it flatters past results).",
+            "- Swing universe: Nasdaq-100 as of Jan 2021 (rebuilt from memory; acquired names missing), "
+            "ranked daily by 3-month strength, top 10 tradable.",
             "- Earnings dates are not modelled; the live rule cuts size or skips around earnings.",
             "- Fills assume limit orders at the signal close +0.5%, with slippage of "
             f"{STOCK_COSTS.slippage:.2%} (stocks) and {CRYPTO_COSTS.slippage:.2%} (crypto) per fill.",

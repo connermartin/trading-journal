@@ -2,7 +2,7 @@
 # Rule changes require explicit owner approval; the agent never edits limits on its own.
 
 status:
-  mode: backtest              # setup -> backtest -> dry_run -> live -> halted
+  mode: dry_run               # setup -> backtest -> dry_run -> live -> halted
   live_approved: false        # flips only after the owner types "go live"
   kill_switch_engaged: false  # set true by the 50% drawdown tier; only the owner may reset it
 
@@ -23,6 +23,30 @@ allocation:
     core_growth_pct: 40
     swing_momentum_pct: 30
     crypto_pct: 30
+  swing_live_trading: false   # failed its fair backtest (2026-10-31): paper only until it passes
+
+rules:                        # approved 2026-10-31; changes need owner approval
+  core:
+    universe: [QQQ, SMH, XLK, IGV]
+    entry: close above 200-day MA
+    exit: close below 200-day MA (sold next open) or trailing stop
+    trailing_stop_pct: 15
+    max_positions: 4
+  swing:
+    universe: Nasdaq-100 as of Jan 2021 (backtest/universe.py), price > $5, 50-day avg volume > 1M
+    tradable: top 10 by 3-month return each day
+    entry: breakout (20-day closing high, rel. volume > 1.5) or pullback (RSI back above 40 near MA20); MA20 > MA50; beating QQQ over 3 months
+    stop: tighter of 10-day low or 2 x ATR(14)
+    target_r: 2
+    trail_after_1r: breakeven, then 2 x ATR under highest close
+    max_positions: 3
+  crypto:
+    majors: [BTC, ETH]
+    altcoins: [SOL, XRP, BNB]   # at most one altcoin at a time, only if beating BTC over 30 days
+    entry: close above rising 50-day MA (rising = above its value 10 days ago)
+    exit: close below 50-day MA or trailing stop
+    trailing_stop_atr: 3
+    max_positions: 3
   crypto:
     btc_eth_min_share_of_sleeve: 0.667
     altcoin_max_share_of_sleeve: 0.333
@@ -48,6 +72,7 @@ risk_limits:                  # HARD LIMITS: never overridden, even on a strong 
   earnings_in_holding_window: half_size_or_skip
   drawdown_tiers:                     # measured from high_water_mark
     warn_and_halve_size_pct: 25
+    resume_full_size_below_pct: 15    # approved 2026-10-31: recovery buffer, stops on/off flapping
     kill_switch_pct: 50               # close all, stop trading, notify, wait for owner
   settled_cash_only_for_buys: true
   stock_settlement_days: 1            # T+1
@@ -71,6 +96,8 @@ schedule:                             # times in US Eastern
   crypto_checks: ["08:00", "14:00", "20:00"]   # every day, including weekends
 
 dry_run:
+  start_date: 2026-11-02
+  end_date: 2026-11-13
   length_trading_days: 10
   assumed_starting_equity_usd: 3000   # hypothetical; replaced by real equity when funded
 

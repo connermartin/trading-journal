@@ -94,7 +94,7 @@ def test_kill_switch_at_fifty_percent():
 
 def test_stops_never_move_down():
     rules = CoreGrowth(["X"])
-    closes = list(np.linspace(100, 160, 120)) + list(np.linspace(160, 150, 10))
+    closes = list(np.linspace(100, 160, 260)) + list(np.linspace(160, 150, 10))
     res = engine.run(rules, {"X": bars_from_close(closes)}, 10_000, costs=NO_COSTS)
     assert res.trades, "uptrend should trigger a trend entry"
 
@@ -109,3 +109,27 @@ def test_rsi_bounds_and_sma():
     s = pd.Series(np.linspace(1, 50, 60))
     assert ti.rsi(s).iloc[-1] == pytest.approx(100.0)
     assert ti.sma(pd.Series([1, 2, 3, 4]), 2).tolist()[1:] == [1.5, 2.5, 3.5]
+
+
+def test_stock_sale_proceeds_settle_next_bar():
+    # Sell on day 4 (stop); the cash is unsettled that day and settled the next.
+    df = bars_from_close([100, 100, 100, 100, 90, 90])
+    costs = engine.Costs(slippage=0.0, limit_offset=0.0, settle_bars=1)
+    res = engine.run(OneShot(day=1, stop=95), {"X": df.iloc[:5]}, 10_000, costs=costs)
+    assert res.unsettled == pytest.approx(20 * 90)
+    res = engine.run(OneShot(day=1, stop=95), {"X": df}, 10_000, costs=costs)
+    assert res.unsettled == 0 and res.cash == pytest.approx(10_000 - 20 * 10)
+
+
+def test_full_size_resumes_only_under_fifteen_percent():
+    lim = engine.Limits(max_risk_per_trade=1.0, max_position_pct=1.0)
+    closes = [100, 100, 100, 70, 80, 90]  # dd 30% -> 20% (still halved) -> 10% (full size)
+
+    class AllIn(OneShot):
+        def entry_signal(self, sym, ind, i):
+            return Signal("X", 1.0, None, 1.0, "test") if i == 1 else None
+
+    res = engine.run(AllIn(day=1, stop=1.0), {"X": bars_from_close(closes, spread=0.01)},
+                     10_000, limits=lim, costs=NO_COSTS)
+    assert [e.split(": ")[1][:8] for e in res.events] == ["drawdown", "drawdown"]
+    assert "back under 15%" in res.events[1] and res.events[1].startswith(str(bars_from_close(closes).index[5].date()))

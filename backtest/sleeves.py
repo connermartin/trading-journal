@@ -29,32 +29,45 @@ def _ok(*vals) -> bool:
 
 
 class CoreGrowth(SleeveRules):
-    """Trend following on growth ETFs: in above a rising 50-day MA, out below it."""
+    """Slow trend following on growth ETFs (approved 2026-10-31, replacing the 50-day rule).
+
+    Hold while the close is above the 200-day MA. Exit on a close below it, or on a
+    trailing stop 15% under the highest close since entry.
+    """
 
     name = "Core growth"
     sleeve_share = 0.40
-    trail_atr = 2.5
+    ma_days = 200
+    trail_pct = 0.15
 
     def __init__(self, universe=("QQQ", "SMH", "XLK", "IGV"), max_positions=4):
         self.universe = list(universe)
         self.max_positions = max_positions
 
     def prepare(self, bars):
-        return {s: _base_indicators(bars[s]) for s in self.universe if s in bars}
+        out = {}
+        for s in self.universe:
+            if s in bars:
+                df = _base_indicators(bars[s])
+                df["sma_slow"] = ti.sma(df["close"], self.ma_days)
+                out[s] = df
+        return out
 
     def entry_signal(self, sym, ind, i):
         r = ind[sym].iloc[i]
-        if not _ok(r["close"], r["sma50"], r["sma50_prev10"], r["atr14"], r["ret63"]):
+        if not _ok(r["close"], r["sma_slow"]):
             return None
-        if r["close"] > r["sma50"] and r["sma50"] > r["sma50_prev10"]:
-            return Signal(sym, r["close"] - self.trail_atr * r["atr14"], None, r["ret63"], "trend")
+        if r["close"] > r["sma_slow"]:
+            score = r["ret63"] if _ok(r["ret63"]) else 0.0
+            note = f"close {r['close']:.2f} > {self.ma_days}-day MA {r['sma_slow']:.2f}"
+            return Signal(sym, r["close"] * (1 - self.trail_pct), None, score, "trend", note)
         return None
 
     def exit_on_close(self, pos: Position, row) -> bool:
-        return _ok(row["sma50"]) and row["close"] < row["sma50"]
+        return _ok(row["sma_slow"]) and row["close"] < row["sma_slow"]
 
     def trail_stop(self, pos: Position, row) -> float:
-        return pos.highest_close - self.trail_atr * row["atr14"] if _ok(row["atr14"]) else pos.stop
+        return pos.highest_close * (1 - self.trail_pct)
 
 
 class SwingMomentum(SleeveRules):
@@ -63,10 +76,11 @@ class SwingMomentum(SleeveRules):
     name = "Swing momentum"
     sleeve_share = 0.30
 
-    def __init__(self, universe, benchmark="QQQ", max_positions=3):
+    def __init__(self, universe, benchmark="QQQ", max_positions=3, top_n=10):
         self.universe = list(universe)
         self.benchmark = benchmark
         self.max_positions = max_positions
+        self.top_n = top_n  # only the N strongest names (3-month return) are tradable each day
 
     def prepare(self, bars):
         ind = {s: _base_indicators(bars[s]) for s in self.universe if s in bars}
@@ -74,12 +88,19 @@ class SwingMomentum(SleeveRules):
         for s, df in ind.items():
             df["bench_ret63"] = bench["ret63"].reindex(df.index)
             df["dollar_ok"] = (df["close"] > 5) & (df["volume"].rolling(50).mean() > 1_000_000)
+        # Daily rank by 3-month return among names passing the price/volume filters.
+        ret = pd.DataFrame({s: df["ret63"].where(df["dollar_ok"]) for s, df in ind.items()})
+        rank = ret.rank(axis=1, ascending=False)
+        for s, df in ind.items():
+            df["rs_rank"] = rank[s].reindex(df.index)
         return ind
 
     def entry_signal(self, sym, ind, i):
         r = ind[sym].iloc[i]
         if not _ok(r["close"], r["sma20"], r["sma50"], r["atr14"], r["rsi14"], r["ret63"],
                    r["bench_ret63"], r["relvol"], r["low10"]) or not bool(r["dollar_ok"]):
+            return None
+        if not _ok(r["rs_rank"]) or r["rs_rank"] > self.top_n:
             return None
         uptrend = r["sma20"] > r["sma50"]
         stronger = r["ret63"] > r["bench_ret63"]
@@ -97,7 +118,10 @@ class SwingMomentum(SleeveRules):
         if stop >= r["close"]:
             return None
         risk = r["close"] - stop
-        return Signal(sym, stop, r["close"] + 2 * risk, r["ret63"] - r["bench_ret63"], setup)
+        note = (f"{setup}: close {r['close']:.2f}, 20-day high {r['hi20']:.2f}, MA20 {r['sma20']:.2f} > MA50 "
+                f"{r['sma50']:.2f}, RSI {r['rsi14']:.0f}, rel. volume {r['relvol']:.1f}, 3-mo return "
+                f"{r['ret63']:+.1%} vs QQQ {r['bench_ret63']:+.1%} (strength rank {r['rs_rank']:.0f})")
+        return Signal(sym, stop, r["close"] + 2 * risk, r["ret63"] - r["bench_ret63"], setup, note)
 
     def exit_on_close(self, pos, row) -> bool:
         return False  # exits come from the stop, the 2R target, or the trail
@@ -146,7 +170,9 @@ class CryptoTrend(SleeveRules):
             score = r["ret30"] - r["btc_ret30"]
         else:
             score = 10 + r["ret30"]  # majors always ranked ahead of altcoins
-        return Signal(sym, r["close"] - self.trail_atr * r["atr14"], None, score, "trend")
+        note = (f"close {r['close']:.2f} > rising 50-day MA {r['sma50']:.2f} (was {r['sma50_prev10']:.2f} "
+                f"10 days ago), 30-day return {r['ret30']:+.1%}")
+        return Signal(sym, r["close"] - self.trail_atr * r["atr14"], None, score, "trend", note)
 
     def exit_on_close(self, pos, row) -> bool:
         return _ok(row["sma50"]) and row["close"] < row["sma50"]

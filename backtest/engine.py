@@ -38,6 +38,7 @@ class Limits:
     max_position_pct_alt: float = 0.15
     max_new_entries_per_day: int = 3
     dd_halve_size: float = 0.25
+    dd_resume_full_size: float = 0.15  # full size again only once back under 15%
     dd_kill: float = 0.50
 
 
@@ -45,6 +46,7 @@ class Limits:
 class Costs:
     slippage: float = 0.0005      # 5 bps per fill (stocks); crypto uses a wider spread
     limit_offset: float = 0.005   # entry limit = signal close + 0.5%
+    settle_bars: int = 1          # stock sale proceeds usable after T+1; crypto 0
 
 
 @dataclass
@@ -54,6 +56,7 @@ class Signal:
     target: float | None
     score: float          # higher = preferred when slots are scarce
     setup: str            # e.g. "breakout", "pullback", "trend"
+    note: str = ""        # indicator values behind the signal, for the journal
 
 
 @dataclass
@@ -67,6 +70,8 @@ class Position:
     target: float | None
     setup: str
     highest_close: float
+    note: str = ""
+    sizing: str = ""
     exit_next_open: bool = False
     exit_reason: str = "close below 50-day MA"
 
@@ -82,6 +87,8 @@ class Trade:
     shares: float
     initial_stop: float
     reason: str
+    note: str = ""
+    sizing: str = ""
 
     @property
     def pnl(self) -> float:
@@ -100,6 +107,13 @@ class Result:
     trades: list[Trade]
     events: list[str] = field(default_factory=list)
     exposure: float = 0.0  # fraction of days with at least one position
+    open_positions: list = field(default_factory=list)
+    pending_orders: list = field(default_factory=list)  # (Signal, limit) for the next bar
+    cash: float = 0.0
+    unsettled: float = 0.0
+    halved: bool = False
+    killed: bool = False
+    high_water_mark: float = 0.0
 
 
 class SleeveRules:
@@ -140,7 +154,8 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
         index = index[index >= pd.Timestamp(start)]
     frames = {s: df.reindex(index) for s, df in ind.items()}
 
-    cash = initial
+    cash = initial          # settled cash only: the only money buys may use
+    unsettled: list[list] = []  # [bars until settled, amount]
     positions: dict[str, Position] = {}
     pending: list[tuple[Signal, float]] = []  # (signal, limit price) for the next bar
     trades: list[Trade] = []
@@ -155,13 +170,22 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
     def close_position(pos: Position, date, price: float, reason: str):
         nonlocal cash
         fill = price * (1 - costs.slippage)
-        cash += pos.shares * fill
+        if costs.settle_bars > 0:
+            unsettled.append([costs.settle_bars, pos.shares * fill])
+        else:
+            cash += pos.shares * fill
         trades.append(Trade(pos.symbol, pos.setup, pos.entry_date, pos.entry, date, fill,
-                            pos.shares, pos.initial_stop, reason))
+                            pos.shares, pos.initial_stop, reason, pos.note, pos.sizing))
         del positions[pos.symbol]
 
     for i, date in enumerate(index):
         rows = {s: f.iloc[i] for s, f in frames.items()}
+
+        # 0. Proceeds from earlier sales settle (T+1 for stocks).
+        for u in unsettled:
+            u[0] -= 1
+        cash += sum(a for n, a in unsettled if n <= 0)
+        unsettled[:] = [u for u in unsettled if u[0] > 0]
 
         # 1. Exits flagged at yesterday's close, sold at today's open.
         for pos in list(positions.values()):
@@ -170,7 +194,7 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
                 close_position(pos, date, row["open"], pos.exit_reason)
 
         # 2. Yesterday's entry orders (limit orders, valid for this bar only).
-        equity_now = cash + sum(p.shares * last_close.get(p.symbol, p.entry) for p in positions.values())
+        equity_now = cash + sum(a for _, a in unsettled) + sum(p.shares * last_close.get(p.symbol, p.entry) for p in positions.values())
         account_equity = equity_now / rules.sleeve_share
         for sig, limit in pending:
             row = rows[sig.symbol]
@@ -190,8 +214,13 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
             if shares * fill < 1.0:
                 continue
             cash -= shares * fill
+            sizing = (f"account ${account_equity:,.0f} x {limits.max_risk_per_trade:.0%}"
+                      f"{' x 0.5 (drawdown tier)' if halved else ''} = risk ${risk_budget:,.0f}; "
+                      f"/ ${risk_per_share:,.2f} risk per share = {risk_budget / risk_per_share:,.3f}; "
+                      f"slot ${slot:,.0f} = {slot / fill:,.3f}; {cap_pct:.0%} cap = {account_equity * cap_pct / fill:,.3f}; "
+                      f"settled cash ${cash:,.0f} = {cash / fill:,.3f} -> {shares:,.4f} used (${shares * fill:,.0f})")
             positions[sig.symbol] = Position(sig.symbol, date, fill, shares, sig.stop, sig.stop,
-                                             sig.target, sig.setup, fill)
+                                             sig.target, sig.setup, fill, sig.note, sizing)
         pending = []
 
         # 3. Intraday: resting stop and target orders.
@@ -210,7 +239,7 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
         for s, row in rows.items():
             if not np.isnan(row["close"]):
                 last_close[s] = row["close"]
-        equity = cash + sum(p.shares * last_close[p.symbol] for p in positions.values())
+        equity = cash + sum(a for _, a in unsettled) + sum(p.shares * last_close[p.symbol] for p in positions.values())
         equity_curve.append(equity)
         if positions:
             days_exposed += 1
@@ -225,9 +254,9 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
         elif not halved and dd >= limits.dd_halve_size:
             halved = True
             events.append(f"{date.date()}: drawdown {dd:.0%}, new position sizes halved")
-        elif halved and dd < limits.dd_halve_size:
+        elif halved and dd < limits.dd_resume_full_size:
             halved = False
-            events.append(f"{date.date()}: drawdown back under {limits.dd_halve_size:.0%}, full size")
+            events.append(f"{date.date()}: drawdown back under {limits.dd_resume_full_size:.0%}, full size")
 
         for pos in positions.values():
             row = rows[pos.symbol]
@@ -239,7 +268,8 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
                 pos.exit_next_open = True
 
         # 5. New entry signals for tomorrow.
-        if killed or i == len(index) - 1:
+        if killed:
+            pending = []
             continue
         candidates = []
         for s in rules.universe:
@@ -262,8 +292,12 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
     eq = pd.Series(equity_curve, index=index, name=rules.name)
     for pos in positions.values():
         trades.append(Trade(pos.symbol, pos.setup, pos.entry_date, pos.entry, index[-1],
-                            last_close[pos.symbol], pos.shares, pos.initial_stop, "open at end"))
-    return Result(rules.name, eq, trades, events, days_exposed / max(len(index), 1))
+                            last_close[pos.symbol], pos.shares, pos.initial_stop, "open at end",
+                            pos.note, pos.sizing))
+    return Result(rules.name, eq, trades, events, days_exposed / max(len(index), 1),
+                  open_positions=list(positions.values()), pending_orders=pending,
+                  cash=cash, unsettled=sum(a for _, a in unsettled), halved=halved,
+                  killed=killed, high_water_mark=hwm)
 
 
 def buy_and_hold(bars: pd.DataFrame, index: pd.DatetimeIndex, initial: float, name: str) -> pd.Series:
