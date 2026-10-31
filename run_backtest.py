@@ -69,9 +69,9 @@ def main(argv=None) -> Path:
         beat = s_stats["sharpe"] > b_stats["sharpe"] and s_stats["return_per_drawdown"] > b_stats["return_per_drawdown"]
         sections.append((rules.name, capital, res, s_stats, b_stats, t_stats, beat))
 
-    # Whole account: the three sleeves together vs. 70% QQQ / 30% BTC.
+    # Whole account: core (70%) + crypto (30%) vs. 70% QQQ / 30% BTC. Swing is paper only.
     days = curves["Core growth"].index
-    account = sum(c.reindex(days).ffill() for c in curves.values()).dropna()
+    account = sum(curves[n].reindex(days).ffill() for n in ("Core growth", "Crypto")).dropna()
     blend = (engine.buy_and_hold(bars["QQQ"], account.index, args.capital * 0.7, "QQQ")
              + engine.buy_and_hold(bars["BTC-USD"], account.index, args.capital * 0.3, "BTC"))
     acct_stats, blend_stats = report.curve_stats(account, 252), report.curve_stats(blend, 252)
@@ -79,9 +79,9 @@ def main(argv=None) -> Path:
     first, last = days[0].date(), days[-1].date()
     out = [f"# Backtest report ({date.today()})", "",
            f"Period: {first} to {last}. Hypothetical account: ${args.capital:,.0f} "
-           f"(core {0.4:.0%}, swing {0.3:.0%}, crypto {0.3:.0%}).", "",
+           "(core 70%, crypto 30%; swing tested on a separate paper 30%, not in the account).", "",
            "## Whole account", "",
-           report.comparison_table([("All three sleeves", acct_stats), ("70% QQQ / 30% BTC, held", blend_stats)]),
+           report.comparison_table([("Core + crypto", acct_stats), ("70% QQQ / 30% BTC, held", blend_stats)]),
            "", "## Each sleeve vs. its benchmark", "",
            report.comparison_table(rows_perf), "", "## Trades", "", report.trade_table(rows_trades), ""]
     for name, capital, res, s, b, t, beat in sections:

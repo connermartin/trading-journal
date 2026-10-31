@@ -149,14 +149,17 @@ def main(now_utc: datetime | None = None) -> str:
         summary = "No update today: " + "; ".join(log)
         print(summary)
         return summary
+    # The account is core + crypto; swing is a separate paper notional, reported on its own.
     eq = {n: r.equity.iloc[-1] for n, r in results.items()}
     for rules, _ in sleeves:
         eq.setdefault(rules.name, CAPITAL * rules.sleeve_share)
-    equity = sum(eq.values())
-    curves = [r.equity for r in results.values()]
-    days = sorted(set().union(*(c.index for c in curves)))
+    live = [n for n in eq if n not in PAPER_ONLY]
+    equity = sum(eq[n] for n in live)
+    curves = [r.equity for n, r in results.items() if n not in PAPER_ONLY]
+    days = sorted(set().union(*(c.index for c in curves))) if curves else []
     combined = sum(c.reindex(days).ffill().fillna(c.iloc[0]) for c in curves) + sum(
-        CAPITAL * rules.sleeve_share for rules, _ in sleeves if rules.name not in results)
+        CAPITAL * rules.sleeve_share for rules, _ in sleeves
+        if rules.name not in results and rules.name not in PAPER_ONLY) if curves else pd.Series([equity])
     hwm = max(CAPITAL, combined.max())
     dd = 1 - equity / hwm
     session = expected.date() if stocks_fresh else (now_utc.date() - timedelta(days=1))
@@ -165,20 +168,20 @@ def main(now_utc: datetime | None = None) -> str:
     qqq = bars["QQQ"]["close"].iloc[-1] if "QQQ" in bars else ""
     btc = bars["BTC-USD"]["close"].iloc[-1] if "BTC-USD" in bars else ""
     row = {"date": str(session), "mode": "dry_run", "equity_usd": f"{equity:.2f}",
-           "cash_settled_usd": f"{sum(r.cash for r in results.values()):.2f}",
-           "cash_unsettled_usd": f"{sum(r.unsettled for r in results.values()):.2f}",
-           "stocks_usd": f"{eq['Core growth'] + eq['Swing momentum']:.2f}",
+           "cash_settled_usd": f"{sum(r.cash for n, r in results.items() if n not in PAPER_ONLY):.2f}",
+           "cash_unsettled_usd": f"{sum(r.unsettled for n, r in results.items() if n not in PAPER_ONLY):.2f}",
+           "stocks_usd": f"{eq['Core growth']:.2f}",
            "crypto_usd": f"{eq['Crypto']:.2f}", "high_water_mark_usd": f"{hwm:.2f}",
            "drawdown_pct": f"{dd:.2%}", "qqq_close": f"{qqq:.2f}" if qqq != "" else "",
            "btc_close": f"{btc:.2f}" if btc != "" else "",
-           "notes": f"hypothetical ${CAPITAL:,.0f}; swing is paper-only"}
+           "notes": f"hypothetical ${CAPITAL:,.0f} (core 70%, crypto 30%); swing paper ${eq['Swing momentum']:,.2f} not included"}
     rows = list(csv.DictReader(EQUITY_LOG.open())) if EQUITY_LOG.exists() else []
     rows = [r for r in rows if not (r["date"] == row["date"] and r["mode"] == "dry_run")] + [row]
     with EQUITY_LOG.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(row)); w.writeheader(); w.writerows(rows)
 
     # Daily report.
-    open_pos = [(n, p) for n, r in results.items() for p in r.open_positions]
+    open_pos = [(n, p) for n, r in results.items() for p in r.open_positions if n not in PAPER_ONLY]
     pending = [(n, sig, lim) for n, r in results.items() for sig, lim in r.pending_orders]
     start_q = bars["QQQ"].loc[START:, "close"] if "QQQ" in bars else pd.Series(dtype=float)
     start_b = bars["BTC-USD"].loc[START:, "close"] if "BTC-USD" in bars else pd.Series(dtype=float)
@@ -187,8 +190,8 @@ def main(now_utc: datetime | None = None) -> str:
     lines = [
         f"1. Dry-run day {sessions_done} of {TRADING_DAYS} ({session}): hypothetical equity ${equity:,.2f} "
         f"({equity / CAPITAL - 1:+.2%} since start); QQQ {q_ret:+.2%}, BTC {b_ret:+.2%}.",
-        f"2. Sleeves: core ${eq['Core growth']:,.2f}, swing (paper only) ${eq['Swing momentum']:,.2f}, "
-        f"crypto ${eq['Crypto']:,.2f}.",
+        f"2. Sleeves: core ${eq['Core growth']:,.2f}, crypto ${eq['Crypto']:,.2f}; "
+        f"swing paper tracker ${eq['Swing momentum']:,.2f} (separate, not in the account).",
         f"3. New journal entries today: {len(new)}. Open positions: "
         + (", ".join(f"{p.symbol} (stop ${p.stop:,.2f})" for _, p in open_pos) or "none") + ".",
         f"4. Would place next session: "

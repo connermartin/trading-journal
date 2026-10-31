@@ -19,11 +19,11 @@ allocation:
   stocks_target_pct: 70       # core + swing sleeves
   crypto_target_pct: 30
   rebalance_drift_pts: 10     # rebalance when either side drifts more than 10 points
-  sleeves:
-    core_growth_pct: 40
-    swing_momentum_pct: 30
+  sleeves:                    # approved 2026-10-31: swing's 30% moved to core
+    core_growth_pct: 70
+    swing_momentum_pct: 0
     crypto_pct: 30
-  swing_live_trading: false   # failed its fair backtest (2026-10-31): paper only until it passes
+  swing_live_trading: false   # failed its fair backtest: tracked on a separate paper $900 only
 
 rules:                        # approved 2026-10-31; changes need owner approval
   core:
@@ -32,6 +32,9 @@ rules:                        # approved 2026-10-31; changes need owner approval
     exit: close below 200-day MA (sold next open) or trailing stop
     trailing_stop_pct: 15
     max_positions: 4
+    slot_pct_of_account: 17.5   # 70% / 4; 17.5% x 15% stop = 2.6% risk, under the 3% cap
+    start_buffer_pct: 2         # approved 2026-10-31: from the first session, buy only at >= 2% above
+                                # the 200-day MA (or on a fresh cross from below); then normal rule
   swing:
     universe: Nasdaq-100 as of Jan 2021 (backtest/universe.py), price > $5, 50-day avg volume > 1M
     tradable: top 10 by 3-month return each day

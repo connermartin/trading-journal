@@ -5,16 +5,19 @@ Rules approved 2026-10-31 after the backtest in `reports/backtest_2026-10-31_v1_
 Every number referenced here lives in `config.yaml`.
 
 ## Big picture
-- 70% stocks/ETFs (40% core growth + 30% swing momentum) and 30% crypto.
+- 70% core growth ETFs and 30% crypto (swing's 30% was moved to core on 2026-10-31).
 - Rebalance when either side drifts more than 10 points from 70/30.
 - Every position has a stop at entry. Live, the stop is a real order resting at Robinhood,
   so it protects the account between scheduled checks. Stops only move up.
-- **Swing is paper only.** It failed its fair backtest; it runs in the journal, not the account,
-  until a revised version passes.
+- **Swing is paper only.** It failed its fair backtest; it runs on a separate paper $900 in the
+  journal, outside the account, until a revised version passes and you approve it.
 
-## Sleeve 1: Core growth (~40%)
-- Holdings: up to 4 of QQQ, SMH, XLK, IGV, one slot each (10% of the account).
+## Sleeve 1: Core growth (~70%)
+- Holdings: up to 4 of QQQ, SMH, XLK, IGV, one slot each (17.5% of the account).
+  With the 15% stop, each slot risks about 2.6% of the account (limit: 3%).
 - Enter when the close is above the 200-day moving average.
+- Start-up buffer: from the first session, an ETF is bought only once it closes at least 2% above
+  its 200-day average, or crosses up from below it. After that, the normal rule applies.
 - Exit on a close below the 200-day average (sold at the next open), or if the price falls
   15% below its highest close since entry (trailing stop).
 - Why 200 and not 50 days: the 50-day rule whipsawed (272 trades, lost to QQQ on every
@@ -22,7 +25,7 @@ Every number referenced here lives in `config.yaml`.
   backtest, but nearby settings (150, 250 days) did worse, so expect "QQQ with smaller crashes",
   not extra profit.
 
-## Sleeve 2: Swing momentum (~30%, PAPER ONLY)
+## Sleeve 2: Swing momentum (PAPER ONLY, separate $900, not in the account)
 - Universe: the Nasdaq-100 as of January 2021, filtered to price > $5 and average volume
   > 1M shares. Each day only the 10 strongest names by 3-month return are tradable.
 - Entry, with the 20-day MA above the 50-day MA and the stock beating QQQ over 3 months:

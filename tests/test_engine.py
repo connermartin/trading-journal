@@ -133,3 +133,28 @@ def test_full_size_resumes_only_under_fifteen_percent():
                      10_000, limits=lim, costs=NO_COSTS)
     assert [e.split(": ")[1][:8] for e in res.events] == ["drawdown", "drawdown"]
     assert "back under 15%" in res.events[1] and res.events[1].startswith(str(bars_from_close(closes).index[5].date()))
+
+
+def test_core_start_buffer_needs_two_percent_or_fresh_cross():
+    rules = CoreGrowth(["X"])
+    rules.ma_days = 3
+    # MA(3) of [100, 100, 100.5] = 100.17: close 100.5 is only +0.3% above -> no entry on day one
+    # unless it is a fresh cross. Day 3's close of 103 is +1.8% above MA 101.2 -> still no;
+    # day 4's close 106 is +3.0% above MA 103.17 -> entry.
+    df = bars_from_close([99, 100, 100.5, 103, 106, 106])
+    ind = rules.prepare({"X": df})
+    df_i = ind["X"]
+    df_i.loc[df_i.index[1], "close"] = 100.2  # yesterday above its MA too: not a fresh cross
+    assert rules.entry_signal("X", ind, 2) is None
+    assert rules.entry_signal("X", ind, 3) is None
+    assert rules.entry_signal("X", ind, 4) is not None
+    assert "X" not in rules.awaiting_buffer
+    assert rules.entry_signal("X", ind, 5) is not None  # normal rule afterwards
+
+
+def test_core_fresh_cross_skips_buffer():
+    rules = CoreGrowth(["X"])
+    rules.ma_days = 3
+    df = bars_from_close([102, 101, 99, 100.5])  # day 2 closes below MA, day 3 just above: fresh cross
+    ind = rules.prepare({"X": df})
+    assert rules.entry_signal("X", ind, 3) is not None

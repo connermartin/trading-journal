@@ -33,12 +33,18 @@ class CoreGrowth(SleeveRules):
 
     Hold while the close is above the 200-day MA. Exit on a close below it, or on a
     trailing stop 15% under the highest close since entry.
+
+    Start-up buffer (approved 2026-10-31): from the first session, an ETF is only bought once
+    it closes at least 2% above its 200-day MA, or makes a fresh cross from below. After an
+    ETF has qualified once, the normal rule applies. This avoids buying on day one an ETF
+    sitting right on the line, which the backtest (entries mostly at fresh crosses) didn't test.
     """
 
     name = "Core growth"
-    sleeve_share = 0.40
+    sleeve_share = 0.70   # 40% core + the 30% moved from swing (approved 2026-10-31)
     ma_days = 200
     trail_pct = 0.15
+    start_buffer = 0.02
 
     def __init__(self, universe=("QQQ", "SMH", "XLK", "IGV"), max_positions=4):
         self.universe = list(universe)
@@ -51,12 +57,20 @@ class CoreGrowth(SleeveRules):
                 df = _base_indicators(bars[s])
                 df["sma_slow"] = ti.sma(df["close"], self.ma_days)
                 out[s] = df
+        self.awaiting_buffer = set(out)  # reset for every run
         return out
 
     def entry_signal(self, sym, ind, i):
         r = ind[sym].iloc[i]
         if not _ok(r["close"], r["sma_slow"]):
             return None
+        if sym in self.awaiting_buffer:
+            prev = ind[sym].iloc[i - 1] if i > 0 else None
+            fresh_cross = (prev is not None and _ok(prev["close"], prev["sma_slow"])
+                           and prev["close"] <= prev["sma_slow"] and r["close"] > r["sma_slow"])
+            if not (fresh_cross or r["close"] >= r["sma_slow"] * (1 + self.start_buffer)):
+                return None
+            self.awaiting_buffer.discard(sym)
         if r["close"] > r["sma_slow"]:
             score = r["ret63"] if _ok(r["ret63"]) else 0.0
             note = f"close {r['close']:.2f} > {self.ma_days}-day MA {r['sma_slow']:.2f}"
