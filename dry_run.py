@@ -114,9 +114,16 @@ def main(now_utc: datetime | None = None) -> str:
         (SwingMomentum([s for s in SWING_UNIVERSE if s in bars]), STOCK_COSTS),
         (CryptoTrend([s for s in CRYPTO_MAJORS if s in bars], [s for s in CRYPTO_ALTS if s in bars]), CRYPTO_COSTS),
     ]
+    started = {name: sym in bars and bars[sym].index[-1] >= pd.Timestamp(START)
+               for name, sym in (("stocks", "QQQ"), ("crypto", "BTC-USD"))}
+    if not any(started.values()):
+        msg = f"Dry run starts {START}; no session to process yet."
+        print(msg)
+        return msg
     results = {}
     for rules, costs in sleeves:
-        if (rules.name == "Crypto" and not crypto_fresh) or (rules.name != "Crypto" and not stocks_fresh):
+        kind = "crypto" if rules.name == "Crypto" else "stocks"
+        if not started[kind] or (kind == "crypto" and not crypto_fresh) or (kind == "stocks" and not stocks_fresh):
             continue
         results[rules.name] = engine.run(rules, bars, CAPITAL * rules.sleeve_share, engine.Limits(),
                                          costs, start=START)
