@@ -1,7 +1,7 @@
 # Strategy
 
 Status: **dry run** (2026-11-02 to 2026-11-13, hypothetical $3,000, no orders placed).
-Rules approved 2026-10-31 after the backtest in `reports/backtest_2026-10-31.md`.
+Rules approved 2026-10-31 after the backtest in `reports/backtest_2026-10-31_v1_original_rules.md and _v2_approved_rules.md`.
 Every number referenced here lives in `config.yaml`.
 
 ## Big picture

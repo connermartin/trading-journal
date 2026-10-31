@@ -1,4 +1,4 @@
-# Backtest report (2026-10-31)
+# Backtest report v2: approved rules (2026-10-31)
 
 Period: 2021-01-04 to 2026-10-30. Hypothetical account: $3,000 (core 40%, swing 30%, crypto 30%).
 

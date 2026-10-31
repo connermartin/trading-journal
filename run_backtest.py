@@ -99,6 +99,10 @@ def main(argv=None) -> Path:
             "- Sharpe uses a 0% risk-free rate. Past results do not predict future results."]
     args.out.mkdir(parents=True, exist_ok=True)
     path = args.out / f"backtest_{date.today()}.md"
+    n = 2
+    while path.exists():  # never overwrite an earlier report
+        path = args.out / f"backtest_{date.today()}_{n}.md"
+        n += 1
     path.write_text("\n".join(out))
     print("\n".join(out))
     return path
