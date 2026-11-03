@@ -146,7 +146,13 @@ class SleeveRules:
 
 def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
         limits: Limits = Limits(), costs: Costs = Costs(),
-        start: str | None = None) -> Result:
+        start: str | None = None,
+        earnings: dict[str, list[str]] | None = None,
+        earnings_window_days: int = 14) -> Result:
+    """earnings: {symbol: ["YYYY-MM-DD", ...]}. An entry is skipped when the symbol reports
+    on the fill day or within `earnings_window_days` calendar days after it (the earnings rule:
+    "half size or skip"; this system skips)."""
+    earn = {s: [pd.Timestamp(d) for d in ds] for s, ds in (earnings or {}).items()}
     ind = rules.prepare(bars)
     index = sorted(set().union(*(df.index for df in ind.values())))
     index = pd.DatetimeIndex(index)
@@ -199,6 +205,10 @@ def run(rules: SleeveRules, bars: dict[str, pd.DataFrame], initial: float,
         for sig, limit in pending:
             row = rows[sig.symbol]
             if killed or sig.symbol in positions or len(positions) >= rules.max_positions:
+                continue
+            if any(date <= d <= date + pd.Timedelta(days=earnings_window_days)
+                   for d in earn.get(sig.symbol, [])):
+                events.append(f"{date.date()}: {sig.symbol} entry skipped, earnings inside the holding window")
                 continue
             if np.isnan(row["open"]) or row["low"] > limit:
                 continue  # data gap or limit never reached: order expires unfilled

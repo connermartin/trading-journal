@@ -30,6 +30,7 @@ START = "2026-11-02"           # first dry-run session
 TRADING_DAYS = 10              # two weeks
 CAPITAL = 3000.0               # hypothetical, from config.yaml
 STATE = ROOT / "state" / "journaled.json"
+EARNINGS = ROOT / "state" / "earnings.json"   # {symbol: [report dates]}, filled from Robinhood
 JOURNAL = ROOT / "trade_journal.md"
 EQUITY_LOG = ROOT / "equity_log.csv"
 DAILY_DIR = ROOT / "reports" / "daily"
@@ -120,13 +121,14 @@ def main(now_utc: datetime | None = None) -> str:
         msg = f"Dry run starts {START}; no session to process yet."
         print(msg)
         return msg
+    earnings = json.loads(EARNINGS.read_text()) if EARNINGS.exists() else {}
     results = {}
     for rules, costs in sleeves:
         kind = "crypto" if rules.name == "Crypto" else "stocks"
         if not started[kind] or (kind == "crypto" and not crypto_fresh) or (kind == "stocks" and not stocks_fresh):
             continue
         results[rules.name] = engine.run(rules, bars, CAPITAL * rules.sleeve_share, engine.Limits(),
-                                         costs, start=START)
+                                         costs, start=START, earnings=earnings)
 
     # Journal: append entries and exits not written before.
     done = set(json.loads(STATE.read_text())) if STATE.exists() else set()

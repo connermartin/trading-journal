@@ -158,3 +158,14 @@ def test_core_fresh_cross_skips_buffer():
     df = bars_from_close([102, 101, 99, 100.5])  # day 2 closes below MA, day 3 just above: fresh cross
     ind = rules.prepare({"X": df})
     assert rules.entry_signal("X", ind, 3) is not None
+
+
+def test_entry_skipped_when_earnings_in_window():
+    df = bars_from_close([100, 100, 100, 100, 100])
+    fill_day = str(df.index[2].date())
+    res = engine.run(OneShot(day=1, stop=95), {"X": df}, 10_000, costs=NO_COSTS,
+                     earnings={"X": [fill_day]})
+    assert res.trades == [] and "earnings" in res.events[0]
+    res = engine.run(OneShot(day=1, stop=95), {"X": df}, 10_000, costs=NO_COSTS,
+                     earnings={"X": ["2030-01-01"]})
+    assert len(res.trades) == 1
