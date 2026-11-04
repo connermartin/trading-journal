@@ -1,3 +1,4 @@
 date,mode,equity_usd,cash_settled_usd,cash_unsettled_usd,stocks_usd,crypto_usd,high_water_mark_usd,drawdown_pct,qqq_close,btc_close,notes
 2026-10-31,setup,0.00,0.00,0.00,0.00,0.00,,,,,Account unfunded. High-water mark will be recorded at funding.
 2026-11-02,dry_run,3000.00,3000.00,0.00,2100.00,900.00,3000.00,0.00%,681.09,76677.30,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $900.00 not included"
+2026-11-03,dry_run,3012.35,1950.00,0.00,2112.35,900.00,3012.35,0.00%,685.28,77345.05,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $899.12 not included"
