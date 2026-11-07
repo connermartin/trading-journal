@@ -55,3 +55,21 @@ Every entry and exit, real or dry-run, gets an entry here in this format:
 - Earnings in window: no (last report 2026-11-04, next 2027-02-03 per state/earnings.json)
 - Order: limit buy, simulated fill $169.68 (1.7578 units)
 - Lesson: A 9.5% stop is wide, so the same 3% risk budget buys fewer dollars of stock; buying right after a report (CDW reported yesterday) also means the biggest scheduled surprise has already passed.
+
+## 2026-11-06 · XLK · EXIT · Core growth · DRY RUN
+- Reason: close below 50-day MA
+- Entry 2026-11-03 $175.18 -> exit $166.88
+- Outcome: -24.88 (-4.7%), -0.31R, 3 days held
+- Lesson: A small loss taken when the rule says exit is the system working: you cap the damage at a fraction of one risk unit (-0.31R) instead of hoping the trade recovers.
+
+## 2026-11-06 · ISRG · EXIT · Swing momentum · DRY RUN · PAPER ONLY
+- Reason: stop
+- Entry 2026-11-05 $483.12 -> exit $451.57
+- Outcome: -19.71 (-6.5%), -1.01R, 1 days held
+- Lesson: A stop only protects you if you honor it: this one-day loss of about 1R is exactly the loss that was planned at entry, which is why sizing by risk matters more than predicting direction.
+
+## 2026-11-06 · CDW · EXIT · Swing momentum · DRY RUN · PAPER ONLY
+- Reason: stop
+- Entry 2026-11-05 $169.68 -> exit $153.47
+- Outcome: -28.49 (-9.6%), -1.00R, 1 days held
+- Lesson: Stops can fill at or near the planned level when price gaps through it; a -1.00R result right after entry shows a breakout can fail immediately, and the fixed risk budget is what kept it small.
