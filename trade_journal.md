@@ -73,3 +73,11 @@ Every entry and exit, real or dry-run, gets an entry here in this format:
 - Entry 2026-11-05 $169.68 -> exit $153.47
 - Outcome: -28.49 (-9.6%), -1.00R, 1 days held
 - Lesson: Stops can fill at or near the planned level when price gaps through it; a -1.00R result right after entry shows a breakout can fail immediately, and the fixed risk budget is what kept it small.
+
+## 2026-11-10 · XLK · ENTRY · Core growth · DRY RUN
+- Signal: close 170.88 > 200-day MA 170.04
+- Entry / Stop / Target: $168.76 / $145.25 / none (trend exit)  (risk $23.52 per share, 13.9%)
+- Size math: account $2,967 x 3% = risk $89; / $23.52 risk per share = 3.786; slot $519 = 3.077; 20% cap = 3.517; settled cash $1,031 = 6.108 -> 3.0771 used ($519)
+- Earnings in window: no (ETF, no single-company earnings)
+- Order: limit buy, simulated fill $168.76 (3.0771 units)
+- Lesson: Re-entering soon after a trend exit is normal for a trend rule: XLK closed back above its 200-day average, so the system buys again with a fresh stop, accepting that some whipsaw losses are the price of staying with the trend.
