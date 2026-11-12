@@ -81,3 +81,9 @@ Every entry and exit, real or dry-run, gets an entry here in this format:
 - Earnings in window: no (ETF, no single-company earnings)
 - Order: limit buy, simulated fill $168.76 (3.0771 units)
 - Lesson: Re-entering soon after a trend exit is normal for a trend rule: XLK closed back above its 200-day average, so the system buys again with a fresh stop, accepting that some whipsaw losses are the price of staying with the trend.
+
+## 2026-11-11 · XLK · EXIT · Core growth · DRY RUN
+- Reason: close below 50-day MA
+- Entry 2026-11-10 $168.76 -> exit $173.69
+- Outcome: +15.17 (+2.9%), +0.21R, 1 days held
+- Lesson: A rule that exits on a close below the trend line and re-enters on a close above it will sometimes sell low and buy back higher the next day (out at $173.69, back in near $175): this whipsaw cost is the premium you pay for the protection the 200-day rule gives in a real downtrend.
