@@ -87,3 +87,19 @@ Every entry and exit, real or dry-run, gets an entry here in this format:
 - Entry 2026-11-10 $168.76 -> exit $173.69
 - Outcome: +15.17 (+2.9%), +0.21R, 1 days held
 - Lesson: A rule that exits on a close below the trend line and re-enters on a close above it will sometimes sell low and buy back higher the next day (out at $173.69, back in near $175): this whipsaw cost is the premium you pay for the protection the 200-day rule gives in a real downtrend.
+
+## 2026-11-12 · QQQ · ENTRY · Core growth · DRY RUN
+- Signal: close 690.38 > 200-day MA 680.65
+- Entry / Stop / Target: $680.66 / $586.82 / none (trend exit)  (risk $93.84 per share, 13.8%)
+- Size math: account $2,995 x 3% = risk $90; / $93.84 risk per share = 0.957; slot $524 = 0.770; 20% cap = 0.880; settled cash $1,041 = 1.530 -> 0.7700 used ($524)
+- Earnings in window: no (ETF, no single-company earnings; not in state/earnings.json)
+- Order: limit buy, simulated fill $680.66 (0.7700 units)
+- Lesson: QQQ's limit order filled at $680.66 because it opened below the prior close, a reminder that a limit order caps the price you pay but a gap can hand you a better fill than the signal day's close.
+
+## 2026-11-12 · XLK · ENTRY · Core growth · DRY RUN
+- Signal: close 174.36 > 200-day MA 170.29
+- Entry / Stop / Target: $169.93 / $148.21 / none (trend exit)  (risk $21.73 per share, 12.8%)
+- Size math: account $2,995 x 3% = risk $90; / $21.73 risk per share = 4.135; slot $524 = 3.084; 20% cap = 3.525; settled cash $517 = 3.043 -> 3.0841 used ($524)
+- Earnings in window: no (ETF, no single-company earnings; not in state/earnings.json)
+- Order: limit buy, simulated fill $169.93 (3.0841 units)
+- Lesson: Buying XLK back one day after selling it shows the full cost of a whipsaw: the round trip (out $173.69, back in $169.93) happened to be cheap this time, but each re-entry also resets the risk, so size every trade from the new stop, not from past results.

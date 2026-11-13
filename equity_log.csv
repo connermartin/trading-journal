@@ -8,3 +8,4 @@ date,mode,equity_usd,cash_settled_usd,cash_unsettled_usd,stocks_usd,crypto_usd,h
 2026-11-09,dry_run,2977.25,2450.12,0.00,2077.25,900.00,3017.00,1.32%,679.35,75223.15,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $851.49 not included"
 2026-11-10,dry_run,2971.82,1930.81,0.00,2071.82,900.00,3017.00,1.50%,674.76,73720.12,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $859.46 not included"
 2026-11-11,dry_run,2996.41,1930.81,534.48,2096.41,900.00,3017.00,0.68%,690.38,73964.47,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $860.12 not included"
+2026-11-12,dry_run,3009.97,1417.08,0.00,2109.97,900.00,3017.00,0.23%,688.17,71342.97,"hypothetical $3,000 (core 70%, crypto 30%); swing paper $856.87 not included"
